@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>ScoreMyDeck — Get Your Fundability Score in 60 Seconds</title>
+<meta name="description" content="AI that evaluates your pitch deck like a real VC. Get a score out of 100. See exactly why investors will say no." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0f11;
+    --bg2: #13151a;
+    --bg3: #1a1c23;
+    --border: rgba(255,255,255,0.07);
+    --border-glow: rgba(99,210,163,0.25);
+    --text: #f0f0ef;
+    --muted: #7a7d85;
+    --muted2: #555860;
+    --accent: #63d2a3;
+    --red: #f05c5c;
+    --orange: #f0954a;
+    --yellow: #f0c84a;
+    --green: #63d2a3;
+    --font-display: 'Bricolage Grotesque', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+    --radius: 12px;
+    --radius-lg: 18px;
+    --shadow: 0 4px 32px rgba(0,0,0,0.5);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.5;
+  }
+
+  /* REVEAL */
+  .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1); }
+  .reveal.visible { opacity: 1; transform: none; }
+  .reveal-delay-1 { transition-delay: 0.08s; }
+  .reveal-delay-2 { transition-delay: 0.16s; }
+  .reveal-delay-3 { transition-delay: 0.24s; }
+  .reveal-delay-4 { transition-delay: 0.32s; }
+
+  /* LAYOUT */
+  .container { width: 100%; padding: 0 18px; margin: 0 auto; }
+  @media (min-width: 480px)  { .container { padding: 0 24px; } }
+  @media (min-width: 768px)  { .container { max-width: 680px; padding: 0 32px; } }
+  @media (min-width: 1024px) { .container { max-width: 960px; padding: 0 48px; } }
+  @media (min-width: 1280px) { .container { max-width: 1100px; } }
+
+  /* BADGE */
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(99,210,163,0.08); border: 1px solid rgba(99,210,163,0.2);
+    border-radius: 100px; padding: 5px 13px;
+    font-size: 12px; font-weight: 500; color: var(--accent); letter-spacing: 0.02em;
+  }
+  .badge-dot {
+    width: 6px; height: 6px; background: var(--accent); border-radius: 50%; flex-shrink: 0;
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.65); }
+  }
+
+  /* ── HERO ── */
+  #hero { position: relative; padding: 44px 0 48px; display: flex; flex-direction: column; overflow: hidden; }
+  .hero-glow {
+    position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+    width: 340px; height: 280px;
+    background: radial-gradient(ellipse at center, rgba(99,210,163,0.09) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-content { position: relative; z-index: 1; }
+
+  .hero-headline {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 8vw, 52px);
+    font-weight: 800; line-height: 1.1; letter-spacing: -0.025em;
+    margin: 14px 0 12px; color: #fff;
+  }
+  .hero-headline em { font-style: normal; color: var(--accent); }
+
+  .hero-sub {
+    font-size: 15px; line-height: 1.6; color: var(--muted);
+    margin-bottom: 10px; font-weight: 400;
+  }
+  .hero-urgency {
+    font-size: 14px; font-weight: 600; color: #dededb;
+    margin-bottom: 20px; letter-spacing: -0.01em; line-height: 1.5;
+  }
+
+  /* FORM */
+  .waitlist-form { display: flex; flex-direction: column; gap: 9px; width: 100%; }
+  .waitlist-input {
+    width: 100%; height: 50px;
+    background: var(--bg3); border: 1.5px solid var(--border); border-radius: var(--radius);
+    padding: 0 16px; font-family: var(--font-body); font-size: 16px; color: var(--text);
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none; appearance: none;
+  }
+  .waitlist-input::placeholder { color: #8a8d96; font-size: 13px; }
+  .waitlist-input:focus { border-color: rgba(99,210,163,0.4); box-shadow: 0 0 0 3px rgba(99,210,163,0.07); }
+
+  .waitlist-btn {
+    width: 100%; height: 50px;
+    background: var(--accent); color: #0a1a12; border: none; border-radius: var(--radius);
+    font-family: var(--font-display); font-size: 13px; font-weight: 700;
+    letter-spacing: 0.01em; padding: 0 18px; white-space: nowrap; cursor: pointer;
+    position: relative; overflow: hidden;
+    transition: background 0.2s, transform 0.12s, box-shadow 0.2s;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .waitlist-btn::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.12), transparent); pointer-events: none;
+  }
+  .waitlist-btn:hover  { background: #7fffc0; box-shadow: 0 0 0 3px rgba(99,210,163,0.2), 0 0 36px rgba(99,210,163,0.45); }
+  .waitlist-btn:active { transform: scale(0.97); }
+  .waitlist-btn.success { background: #3da878; }
+
+  @keyframes fadeInMsg {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @media (min-width: 500px) {
+    .waitlist-form { flex-direction: row; }
+    .waitlist-input { flex: 1; min-width: 0; }
+    .waitlist-btn { width: auto; flex-shrink: 0; }
+  }
+
+  .trust-line {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--muted2); margin-top: 8px; line-height: 1.4;
+  }
+  .trust-line svg { flex-shrink: 0; }
+
+  .vc-trust {
+    margin-top: 10px; font-size: 11.5px; color: var(--muted2); line-height: 1.5;
+    padding: 8px 12px; background: rgba(255,255,255,0.025);
+    border: 1px solid var(--border); border-radius: 8px; display: inline-block; max-width: 100%;
+  }
+
+  .social-proof { display: flex; align-items: center; gap: 9px; margin-top: 14px; flex-wrap: wrap; }
+  .proof-avatars { display: flex; }
+  .proof-avatar {
+    width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--bg);
+    margin-left: -7px; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .proof-avatar:first-child { margin-left: 0; }
+  .proof-text { font-size: 12px; color: var(--muted); }
+  .proof-text strong { color: var(--text); font-weight: 500; }
+
+  /* ── SCORE MOCK ── */
+  .score-mock {
+    position: relative; margin-top: 36px;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow);
+  }
+  .score-mock::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(99,210,163,0.4), transparent);
+  }
+  .mock-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 16px; border-bottom: 1px solid var(--border);
+  }
+  .mock-title {
+    font-family: var(--font-display); font-size: 11px; font-weight: 600;
+    color: var(--muted); letter-spacing: 0.07em; text-transform: uppercase;
+  }
+  .mock-tag {
+    font-size: 10px; background: rgba(99,210,163,0.1); color: var(--accent);
+    border: 1px solid rgba(99,210,163,0.2); border-radius: 5px; padding: 2px 7px; font-weight: 500;
+  }
+  .mock-score-area { padding: 16px; display: flex; align-items: center; gap: 14px; }
+  .score-ring { position: relative; flex-shrink: 0; width: 78px; height: 78px; }
+  .score-ring svg { transform: rotate(-90deg); }
+  .score-ring-bg   { stroke: rgba(255,255,255,0.06); }
+  .score-ring-fill {
+    stroke: var(--accent); stroke-linecap: round;
+    transition: stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+    filter: drop-shadow(0 0 5px rgba(99,210,163,0.5));
+  }
+  .score-number { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .score-number span:first-child { font-family: var(--font-mono); font-size: 23px; font-weight: 500; color: #fff; line-height: 1; }
+  .score-number span:last-child  { font-family: var(--font-mono); font-size: 9px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+  .score-meta { flex: 1; min-width: 0; }
+  .score-deck-name {
+    font-family: var(--font-display); font-size: 14px; font-weight: 700; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px;
+  }
+  .score-verdict { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .score-verdict strong { color: var(--red); font-weight: 500; }
+
+  .mock-bars { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 9px; }
+  .bar-row   { display: flex; flex-direction: column; gap: 5px; }
+  .bar-label { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--muted); }
+  .bar-label strong { color: var(--text); font-weight: 500; }
+  .bar-label span   { font-family: var(--font-mono); font-size: 10.5px; }
+  .bar-track { height: 4px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; }
+  .bar-fill {
+    height: 100%; border-radius: 99px; transform-origin: left; transform: scaleX(0);
+    transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .bar-fill.animated { transform: scaleX(1); }
+  .bar-fill.green  { background: var(--green);  box-shadow: 0 0 6px rgba(99,210,163,0.35); }
+  .bar-fill.yellow { background: var(--yellow); box-shadow: 0 0 6px rgba(240,200,74,0.25); }
+  .bar-fill.orange { background: var(--orange); box-shadow: 0 0 6px rgba(240,149,74,0.25); }
+  .bar-fill.red    { background: var(--red);    box-shadow: 0 0 6px rgba(240,92,92,0.25);  }
+
+  .mock-feedback {
+    margin: 2px 16px 16px; background: rgba(240,92,92,0.05);
+    border: 1px solid rgba(240,92,92,0.14); border-radius: var(--radius); padding: 11px 13px;
+  }
+  .feedback-label {
+    font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--red); margin-bottom: 5px; display: flex; align-items: center; gap: 4px;
+  }
+  .feedback-text { font-size: 12px; line-height: 1.5; color: #d0d0cd; }
+
+  /* SHARED SECTIONS */
+  section { position: relative; z-index: 1; }
+  .divider { height: 1px; background: var(--border); }
+
+  .section-label {
+    font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.11em; color: var(--accent); margin-bottom: 10px;
+  }
+  .section-headline {
+    font-family: var(--font-display);
+    font-size: clamp(22px, 5.5vw, 36px);
+    font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; color: #fff; margin-bottom: 10px;
+  }
+  .section-sub { font-size: 15px; color: var(--muted); line-height: 1.6; font-weight: 400; max-width: 480px; }
+
+  /* PROBLEM */
+  #problem { padding: 60px 0; background: var(--bg); }
+  .problem-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
+  .problem-item {
+    display: flex; align-items: flex-start; gap: 13px; padding: 14px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+    transition: border-color 0.2s;
+  }
+  .problem-item:hover { border-color: rgba(240,92,92,0.22); }
+  .problem-icon {
+    flex-shrink: 0; width: 34px; height: 34px;
+    background: rgba(240,92,92,0.06); border: 1px solid rgba(240,92,92,0.12);
+    border-radius: 9px; display: flex; align-items: center; justify-content: center;
+  }
+  .problem-text { font-size: 14px; font-weight: 500; color: var(--text); line-height: 1.5; padding-top: 6px; }
+
+  /* HOW IT WORKS */
+  #how { padding: 60px 0; background: var(--bg2); }
+  .steps { position: relative; display: flex; flex-direction: column; margin-top: 30px; }
+  .step { display: flex; gap: 16px; position: relative; }
+  .step:not(:last-child)::before {
+    content: ''; position: absolute; left: 18px; top: 42px; bottom: -10px;
+    width: 1px; background: linear-gradient(to bottom, var(--border-glow), var(--border));
+  }
+  .step-num {
+    flex-shrink: 0; width: 38px; height: 38px;
+    background: var(--bg3); border: 1.5px solid var(--border); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 13px; font-weight: 500; color: var(--accent);
+    position: relative; z-index: 1;
+  }
+  .step-body { padding: 5px 0 36px; flex: 1; min-width: 0; }
+  .step:last-child .step-body { padding-bottom: 0; }
+  .step-title { font-family: var(--font-display); font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 3px; line-height: 1.3; }
+  .step-desc  { font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+  /* SAMPLE OUTPUT */
+  #sample { padding: 60px 0; background: var(--bg); }
+  .output-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden; position: relative; margin-top: 28px;
+  }
+  .output-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(99,210,163,0.5), transparent);
+  }
+  .output-top {
+    padding: 16px; display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; border-bottom: 1px solid var(--border);
+  }
+  .output-deck-info { flex: 1; min-width: 0; }
+  .output-deck-name {
+    font-family: var(--font-display); font-size: 14px; font-weight: 700; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .output-deck-meta { font-size: 11px; color: var(--muted2); margin-top: 2px; }
+  .output-score-badge {
+    flex-shrink: 0; background: rgba(99,210,163,0.1); border: 1px solid rgba(99,210,163,0.2);
+    border-radius: 9px; padding: 7px 12px; text-align: center;
+  }
+  .output-score-badge .num  { font-family: var(--font-mono); font-size: 22px; font-weight: 500; color: var(--accent); line-height: 1; }
+  .output-score-badge .denom{ font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+  .output-categories { padding: 14px 16px; display: flex; flex-direction: column; gap: 11px; border-bottom: 1px solid var(--border); }
+  .cat-row { display: flex; align-items: center; gap: 10px; }
+  .cat-name { font-size: 12px; color: var(--muted); width: 110px; flex-shrink: 0; line-height: 1.3; }
+  @media (max-width: 360px) { .cat-name { width: 88px; font-size: 10.5px; } }
+  .cat-bar-track { flex: 1; min-width: 0; height: 4px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; }
+  .cat-bar-fill  { height: 100%; border-radius: 99px; }
+  .cat-score { font-family: var(--font-mono); font-size: 11px; font-weight: 500; width: 32px; text-align: right; flex-shrink: 0; }
+
+  .output-feedbacks { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .feedback-item { display: flex; gap: 9px; align-items: flex-start; }
+  .feedback-badge {
+    flex-shrink: 0; font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; padding: 3px 6px; border-radius: 4px; margin-top: 1px; white-space: nowrap;
+  }
+  .feedback-badge.critical { background: rgba(240,92,92,0.12); color: var(--red);    border: 1px solid rgba(240,92,92,0.2); }
+  .feedback-badge.weak     { background: rgba(240,149,74,0.1); color: var(--orange); border: 1px solid rgba(240,149,74,0.2); }
+  .feedback-badge.good     { background: rgba(99,210,163,0.08); color: var(--accent); border: 1px solid rgba(99,210,163,0.2); }
+  .feedback-content { font-size: 12.5px; color: var(--text); line-height: 1.5; }
+
+  /* FEATURES */
+  #features { padding: 60px 0; background: var(--bg2); }
+  .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 28px; }
+  @media (min-width: 600px)  { .features-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; } }
+  @media (min-width: 1024px) { .features-grid { gap: 16px; } }
+  .feature-card {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px; transition: border-color 0.2s, transform 0.2s; cursor: default;
+  }
+  .feature-card:hover { border-color: rgba(99,210,163,0.2); transform: translateY(-2px); }
+  .feature-icon {
+    width: 34px; height: 34px; background: rgba(99,210,163,0.06); border: 1px solid rgba(99,210,163,0.12);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; flex-shrink: 0;
+  }
+  .feature-name { font-family: var(--font-display); font-size: 12.5px; font-weight: 700; color: #fff; margin-bottom: 4px; line-height: 1.3; }
+  .feature-desc { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+
+  /* ══════════════════════════════
+     VIRAL / SCORE CARDS — mobile-native horizontal scroll
+  ══════════════════════════════ */
+  #viral { padding: 60px 0; background: var(--bg); }
+
+  /* Section header stays in normal container flow */
+  .viral-header { padding: 0 18px; margin-bottom: 24px; }
+  @media (min-width: 480px)  { .viral-header { padding: 0 24px; } }
+  @media (min-width: 768px)  { .viral-header { padding: 0 32px; max-width: 680px; margin-left: auto; margin-right: auto; } }
+  @media (min-width: 1024px) { .viral-header { padding: 0 48px; max-width: 960px; } }
+  @media (min-width: 1280px) { .viral-header { max-width: 1100px; } }
+
+  /* Scroll track — breaks out of container to reach full bleed */
+  .cards-scroll-outer {
+    position: relative; /* anchor for fade overlay */
+  }
+
+  /* Right-edge fade — the "there's more" signal */
+  .cards-scroll-outer::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    width: 72px;
+    background: linear-gradient(to right, transparent, var(--bg));
+    pointer-events: none;
+    z-index: 2;
+    transition: opacity 0.3s;
+  }
+  /* Hide fade when scrolled to end */
+  .cards-scroll-outer.at-end::after { opacity: 0; }
+
+  .cards-scroll-track {
+    display: flex;
+    gap: 12px;
+    /* Left padding aligns first card with page content.
+       Right padding lets last card breathe + combats fade overlay. */
+    padding: 4px 18px 16px 18px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    /* Hide scrollbar across all browsers */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .cards-scroll-track::-webkit-scrollbar { display: none; }
+
+  @media (min-width: 480px) {
+    .cards-scroll-track { padding-left: 24px; padding-right: 24px; gap: 14px; }
+  }
+
+  /* ── SHARE CARD ── */
+  .share-card {
+    /* Mobile: 87vw = 1 full card + ~13% peek of next */
+    flex: 0 0 87vw;
+    max-width: 340px; /* cap on slightly wider phones */
+    scroll-snap-align: start;
+    scroll-snap-stop: always; /* force one-at-a-time snap */
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+    /* Subtle depth lift on active card (JS-driven class) */
+    will-change: transform;
+  }
+
+  /* Active (centred) card gets a premium lift */
+  .share-card.is-active {
+    border-color: rgba(99,210,163,0.22);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(99,210,163,0.1);
+    transform: translateY(-2px);
+  }
+
+  /* Desktop: drop snap, go grid */
+  @media (min-width: 768px) {
+    .cards-scroll-outer::after { display: none; } /* no fade needed */
+    .cards-scroll-track {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      overflow-x: visible;
+      scroll-snap-type: none;
+      padding: 4px 32px 4px;
+      gap: 16px;
+    }
+    .share-card {
+      flex: none;
+      max-width: none;
+      scroll-snap-align: none;
+    }
+    .share-card:hover {
+      border-color: rgba(99,210,163,0.2);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+    }
+    .share-card.is-active { transform: none; box-shadow: none; border-color: var(--border); }
+  }
+  @media (min-width: 1024px) {
+    .cards-scroll-track { padding-left: 48px; padding-right: 48px; max-width: 960px; margin: 0 auto; }
+  }
+  @media (min-width: 1280px) {
+    .cards-scroll-track { max-width: 1100px; }
+  }
+
+  /* Card internals — unchanged */
+  .share-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .share-founder  { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; }
+  .share-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.7);
+    flex-shrink: 0; font-family: var(--font-display);
+    letter-spacing: 0.02em;
+  }
+  .share-name  { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.2; }
+  .share-role  { font-size: 11px; color: var(--muted2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .share-score-badge {
+    font-family: var(--font-mono); font-size: 19px; font-weight: 500; line-height: 1;
+    padding: 6px 11px; border-radius: 9px; flex-shrink: 0;
+  }
+  .share-score-badge span { font-size: 10px; font-weight: 400; opacity: 0.55; margin-left: 1px; }
+  .share-score-badge.green  { color: var(--green);  background: rgba(99,210,163,0.09); border: 1px solid rgba(99,210,163,0.22); }
+  .share-score-badge.orange { color: var(--orange); background: rgba(240,149,74,0.08); border: 1px solid rgba(240,149,74,0.2);  }
+  .share-score-badge.red    { color: var(--red);    background: rgba(240,92,92,0.08);  border: 1px solid rgba(240,92,92,0.2);   }
+
+  .share-verdict {
+    font-size: 13px; color: var(--muted); line-height: 1.55; font-style: italic;
+    margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  }
+  .share-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .share-tag  {
+    font-size: 10.5px; font-weight: 600; padding: 3px 7px; border-radius: 4px;
+    letter-spacing: 0.01em; font-family: var(--font-mono);
+  }
+  .share-tag.green  { background: rgba(99,210,163,0.08); color: var(--green);  border: 1px solid rgba(99,210,163,0.15); }
+  .share-tag.orange { background: rgba(240,149,74,0.08); color: var(--orange); border: 1px solid rgba(240,149,74,0.15); }
+  .share-tag.red    { background: rgba(240,92,92,0.08);  color: var(--red);    border: 1px solid rgba(240,92,92,0.15);  }
+
+  /* ── SCROLL DOTS ── */
+  .scroll-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 18px;
+    height: 8px;
+  }
+  .scroll-dots .dot {
+    width: 5px; height: 5px;
+    border-radius: 99px;
+    background: var(--muted2);
+    transition: width 0.3s cubic-bezier(0.22,1,0.36,1), background 0.3s;
+    flex-shrink: 0;
+  }
+  .scroll-dots .dot.active {
+    width: 18px;
+    background: var(--accent);
+  }
+  /* Hide dots on desktop — not needed */
+  @media (min-width: 768px) { .scroll-dots { display: none; } }
+
+  /* FINAL CTA */
+  #final-cta { padding: 72px 0 88px; background: var(--bg2); text-align: center; position: relative; overflow: hidden; }
+  #final-cta::before {
+    content: ''; position: absolute; bottom: -80px; left: 50%; transform: translateX(-50%);
+    width: 400px; height: 260px;
+    background: radial-gradient(ellipse at center, rgba(99,210,163,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .final-cta-content { position: relative; z-index: 1; }
+  .final-cta-headline {
+    font-family: var(--font-display); font-size: clamp(24px, 6.5vw, 42px);
+    font-weight: 800; line-height: 1.1; letter-spacing: -0.025em; color: #fff; margin: 14px 0 10px;
+  }
+  .final-cta-sub { font-size: 15px; color: var(--muted); font-weight: 400; margin-bottom: 24px; line-height: 1.6; max-width: 380px; margin-left: auto; margin-right: auto; }
+  .final-form { display: flex; flex-direction: column; gap: 9px; max-width: 400px; margin: 0 auto; }
+  @media (min-width: 500px) {
+    .final-form { flex-direction: row; }
+    .final-form .waitlist-btn   { width: auto; flex-shrink: 0; }
+    .final-form .waitlist-input { flex: 1; min-width: 0; }
+  }
+
+  /* FOOTER */
+  footer { padding: 20px 0; border-top: 1px solid var(--border); background: var(--bg); }
+  .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .footer-logo { font-family: var(--font-display); font-size: 14px; font-weight: 800; color: #fff; }
+  .footer-logo span { color: var(--accent); }
+  .footer-copy { font-size: 11.5px; color: var(--muted2); }
+
+  /* STICKY CTA */
+  .sticky-cta {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    padding: 11px 16px; padding-bottom: calc(11px + env(safe-area-inset-bottom));
+    background: rgba(13,14,16,0.94); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border); transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .sticky-cta.visible { transform: translateY(0); }
+  .sticky-cta-inner { display: flex; align-items: center; gap: 10px; max-width: 480px; margin: 0 auto; }
+  .sticky-cta-text { flex: 1; min-width: 0; font-size: 12.5px; color: var(--muted); line-height: 1.3; }
+  .sticky-cta-text strong { color: var(--text); display: block; font-size: 13px; font-weight: 600; }
+  .sticky-cta-btn {
+    flex-shrink: 0; height: 42px; padding: 0 16px;
+    background: var(--accent); color: #0a1a12; border: none; border-radius: var(--radius);
+    font-family: var(--font-display); font-size: 12px; font-weight: 700; white-space: nowrap;
+    cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .sticky-cta-btn:active { transform: scale(0.97); }
+  .sticky-cta-close {
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    color: var(--muted2); cursor: pointer; border: none; background: none; padding: 0; flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%) translateY(16px);
+    background: var(--bg3); border: 1px solid rgba(99,210,163,0.3); border-radius: var(--radius);
+    padding: 11px 18px; font-size: 13px; color: var(--accent); z-index: 200; opacity: 0;
+    transition: opacity 0.3s, transform 0.3s; white-space: nowrap;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4); pointer-events: none; max-width: calc(100vw - 40px);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* MISC */
+  .gradient-text {
+    background: linear-gradient(135deg, var(--accent) 0%, #a8f0d4 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  /* DESKTOP (1024px+) */
+  @media (min-width: 1024px) {
+    #hero { padding: 72px 0 80px; }
+    .hero-glow { top: -100px; width: 700px; height: 500px; }
+    .hero-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+    .hero-sub { font-size: 16px; }
+    .hero-urgency { font-size: 15px; }
+    .score-mock { margin-top: 0; }
+    .sticky-cta { display: none; }
+    #problem, #how, #sample, #features, #viral { padding: 80px 0; }
+    #final-cta { padding: 88px 0 100px; }
+  }
+  @media (min-width: 1280px) { .hero-layout { gap: 72px; } }
+</style>
+</head>
+
+<!-- TOAST -->
+<div class="toast" id="toast">✓ You're on the list! We'll be in touch.</div>
+
+<!-- STICKY CTA (mobile only) -->
+<div class="sticky-cta" id="stickyCta">
+  <div class="sticky-cta-inner">
+    <div class="sticky-cta-text">
+      <strong>Join the waitlist</strong>
+      Know your fundability score first.
+    </div>
+    <button class="sticky-cta-btn" onclick="scrollToHero()">Check My Startup</button>
+    <button class="sticky-cta-close" onclick="dismissSticky()" aria-label="Dismiss">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- ────────────────────────────────
+     HERO
+──────────────────────────────── -->
+<section id="hero">
+  <div class="hero-glow"></div>
+  <div class="container">
+    <div class="hero-layout">
+
+      <!-- LEFT / TOP -->
+      <div class="hero-left hero-content">
+        <div class="badge reveal">
+          <span class="badge-dot"></span>
+          Now in early access
+        </div>
+
+        <h1 class="hero-headline reveal reveal-delay-1">
+          Your startup has<br />
+          a score. Most founders<br />
+          <em>never see it.</em>
+        </h1>
+
+        <p class="hero-sub reveal reveal-delay-2">
+          ScoreMyDeck evaluates your deck like a real VC — brutal, specific, and actionable.
+        </p>
+        <p class="hero-urgency reveal reveal-delay-2">Investors already know your score. You don't.</p>
+
+        <div class="waitlist-form reveal reveal-delay-3" id="heroForm">
+          <input
+            type="email"
+            class="waitlist-input"
+            id="heroEmail"
+            placeholder="Enter your email to see your score"
+            autocomplete="email"
+            inputmode="email"
+          />
+          <button class="waitlist-btn" id="heroBtn" onclick="handleSignup('heroEmail','heroBtn')">
+            Get My Fundability Score
+          </button>
+        </div>
+
+        <div class="trust-line reveal reveal-delay-4">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="#63d2a3" stroke-width="1.2"/><path d="M4 6l1.5 1.5L8 4" stroke="#63d2a3" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Takes 60 seconds · No signup spam
+        </div>
+
+        <div class="vc-trust reveal reveal-delay-4">
+          Based on 1,000+ funded decks — YC, Sequoia, a16z
+        </div>
+
+        <div class="social-proof reveal reveal-delay-4">
+          <div class="proof-avatars">
+            <div class="proof-avatar" style="background:linear-gradient(135deg,#1e3a52,#112233);">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="4.5" r="2" fill="rgba(255,255,255,0.7)"/><path d="M2 10c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linecap="round"/></svg>
+            </div>
+            <div class="proof-avatar" style="background:linear-gradient(135deg,#3a1e52,#221133);">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="4.5" r="2" fill="rgba(255,255,255,0.7)"/><path d="M2 10c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linecap="round"/></svg>
+            </div>
+            <div class="proof-avatar" style="background:linear-gradient(135deg,#1e3a28,#0f2218);">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="4.5" r="2" fill="rgba(255,255,255,0.7)"/><path d="M2 10c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linecap="round"/></svg>
+            </div>
+            <div class="proof-avatar" style="background:linear-gradient(135deg,#3a2e1e,#221a0f);">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="4.5" r="2" fill="rgba(255,255,255,0.7)"/><path d="M2 10c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="rgba(255,255,255,0.7)" stroke-width="1.2" stroke-linecap="round"/></svg>
+            </div>
+          </div>
+          <span class="proof-text">Join early founders <strong>testing ScoreMyDeck</strong></span>
+        </div>
+      </div>
+
+      <!-- RIGHT / BELOW -->
+      <div class="hero-right">
+        <!-- ── SCORE MOCK UI ── -->
+        <div class="score-mock reveal reveal-delay-2" id="scoreMock">
+          <div class="mock-header">
+            <span class="mock-title">Fundability Report</span>
+            <span class="mock-tag">AI Analysis</span>
+          </div>
+
+          <div class="mock-score-area">
+            <div class="score-ring">
+              <svg width="88" height="88" viewBox="0 0 88 88">
+                <circle class="score-ring-bg" cx="44" cy="44" r="36" fill="none" stroke-width="5"/>
+                <circle
+                  class="score-ring-fill"
+                  cx="44" cy="44" r="36"
+                  fill="none" stroke-width="5"
+                  stroke-dasharray="226.2"
+                  stroke-dashoffset="75"
+                  id="ringFill"
+                />
+              </svg>
+              <div class="score-number">
+                <span id="scoreNum">67</span>
+                <span>/ 100</span>
+              </div>
+            </div>
+            <div class="score-meta">
+              <div class="score-deck-name">FinFlow — Series A Deck</div>
+              <div class="score-verdict">
+                Market sizing <strong>not credible</strong> — most investors will pass instantly. Team slide weak.
+              </div>
+            </div>
+          </div>
+
+          <div class="mock-bars">
+            <div class="bar-row">
+              <div class="bar-label">
+                <strong>Problem / Solution</strong>
+                <span>82/100</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill green" style="width:82%"></div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-label">
+                <strong>Market Opportunity</strong>
+                <span>54/100</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill orange" style="width:54%"></div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-label">
+                <strong>Traction &amp; Metrics</strong>
+                <span>71/100</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill yellow" style="width:71%"></div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-label">
+                <strong>Team Strength</strong>
+                <span>38/100</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill red" style="width:38%"></div>
+              </div>
+            </div>
+            <div class="bar-row">
+              <div class="bar-label">
+                <strong>Business Model</strong>
+                <span>75/100</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill green" style="width:75%"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mock-feedback">
+            <div class="feedback-label">
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style="display:inline-block;vertical-align:middle;margin-right:4px;margin-top:-1px"><path d="M5.5 1L10 9.5H1L5.5 1Z" stroke="#f05c5c" stroke-width="1.2" stroke-linejoin="round"/><path d="M5.5 4.5V6.5" stroke="#f05c5c" stroke-width="1.2" stroke-linecap="round"/><circle cx="5.5" cy="8" r="0.5" fill="#f05c5c"/></svg>Critical Issue
+            </div>
+            <div class="feedback-text">
+              Your TAM of $4B appears to be a top-down estimate. Sequoia-style investors will reject this immediately. Rebuild with bottoms-up methodology.
+            </div>
+          </div>
+        </div>
+        <!-- END SCORE MOCK -->
+      </div>
+
+    </div><!-- /hero-layout -->
+  </div><!-- /container -->
+</section>
+
+<div class="divider"></div>
+
+<!-- ────────────────────────────────
+     PROBLEM
+──────────────────────────────── -->
+<section id="problem">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">The Reality</div>
+      <h2 class="section-headline">Most decks get rejected<br />for the same reasons.</h2>
+      <p class="section-sub">You don't find out until after 40 investor meetings and 3 months of silence.</p>
+    </div>
+
+    <div class="problem-grid">
+      <div class="problem-item reveal">
+        <div class="problem-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7.5" stroke="#f05c5c" stroke-width="1.3"/><path d="M9 5v4" stroke="#f05c5c" stroke-width="1.5" stroke-linecap="round"/><circle cx="9" cy="12.5" r="0.8" fill="#f05c5c"/></svg>
+        </div>
+        <div class="problem-text">Investors decide in ~30 seconds. Your deck is losing before you even walk in.</div>
+      </div>
+      <div class="problem-item reveal reveal-delay-1">
+        <div class="problem-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 5h12M3 9h8M3 13h5" stroke="#f05c5c" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="problem-text">No one tells you why they passed. You're left reading silence.</div>
+      </div>
+      <div class="problem-item reveal reveal-delay-2">
+        <div class="problem-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9h12M12 6l3 3-3 3" stroke="#f05c5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 4v10" stroke="#f05c5c" stroke-width="1.4" stroke-linecap="round" opacity="0.4"/></svg>
+        </div>
+        <div class="problem-text">Most founders fix the wrong things — better design, longer bios, new fonts.</div>
+      </div>
+      <div class="problem-item reveal reveal-delay-3">
+        <div class="problem-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 3v6l4 2" stroke="#f05c5c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="6.5" stroke="#f05c5c" stroke-width="1.3"/></svg>
+        </div>
+        <div class="problem-text">The real issues — weak TAM, no moat, unclear ask — stay buried.</div>
+      </div>
+      <div class="problem-item reveal reveal-delay-4">
+        <div class="problem-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2.5" y="6" width="13" height="9.5" rx="1.5" stroke="#f05c5c" stroke-width="1.3"/><path d="M6 6V4.5a3 3 0 016 0V6" stroke="#f05c5c" stroke-width="1.3" stroke-linecap="round"/><circle cx="9" cy="10.5" r="1" fill="#f05c5c"/></svg>
+        </div>
+        <div class="problem-text">You don't need a better deck. You need to know what's actually broken.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ────────────────────────────────
+     HOW IT WORKS
+──────────────────────────────── -->
+<section id="how">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">How It Works</div>
+      <h2 class="section-headline">From zero to fundability<br />score in 60 seconds.</h2>
+    </div>
+
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Upload your deck or describe your idea</div>
+          <div class="step-desc">PDF, URL, or plain text. No formatting required.</div>
+        </div>
+      </div>
+      <div class="step reveal reveal-delay-1">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">AI evaluates across 8 investor criteria</div>
+          <div class="step-desc">Same framework top-tier VCs use to make pass/no-pass decisions.</div>
+        </div>
+      </div>
+      <div class="step reveal reveal-delay-2">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Get your Fundability Score</div>
+          <div class="step-desc">A single number out of 100, with category-level breakdowns.</div>
+        </div>
+      </div>
+      <div class="step reveal reveal-delay-3">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Read specific, brutal feedback</div>
+          <div class="step-desc">Not "add more traction." Exactly which claim fails and why.</div>
+        </div>
+      </div>
+      <div class="step reveal reveal-delay-4">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">Fix, re-score, and fund-raise with confidence</div>
+          <div class="step-desc">Iterate until your score says you're ready to pitch.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ────────────────────────────────
+     SAMPLE OUTPUT
+──────────────────────────────── -->
+<section id="sample">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">Sample Output</div>
+      <h2 class="section-headline">Feedback that actually<br />tells you what to fix.</h2>
+      <p class="section-sub">Real AI output. Not fluff. Not generic. Specific enough to act on today.</p>
+    </div>
+
+    <div class="output-card reveal reveal-delay-1">
+      <div class="output-top">
+        <div class="output-deck-info">
+          <div class="output-deck-name">NovaPay — Fintech Payments</div>
+          <div class="output-deck-meta">Seed Stage · 14 slides · Analyzed 2s ago</div>
+        </div>
+        <div class="output-score-badge">
+          <div class="num">63</div>
+          <div class="denom">/ 100</div>
+        </div>
+      </div>
+
+      <div class="output-categories">
+        <div class="cat-row">
+          <span class="cat-name">Problem Clarity</span>
+          <div class="cat-bar-track">
+            <div class="cat-bar-fill" style="width:88%; background:var(--green);"></div>
+          </div>
+          <span class="cat-score" style="color:var(--green);">88</span>
+        </div>
+        <div class="cat-row">
+          <span class="cat-name">Market Size</span>
+          <div class="cat-bar-track">
+            <div class="cat-bar-fill" style="width:42%; background:var(--red);"></div>
+          </div>
+          <span class="cat-score" style="color:var(--red);">42</span>
+        </div>
+        <div class="cat-row">
+          <span class="cat-name">Competitive Moat</span>
+          <div class="cat-bar-track">
+            <div class="cat-bar-fill" style="width:55%; background:var(--orange);"></div>
+          </div>
+          <span class="cat-score" style="color:var(--orange);">55</span>
+        </div>
+        <div class="cat-row">
+          <span class="cat-name">Traction Signal</span>
+          <div class="cat-bar-track">
+            <div class="cat-bar-fill" style="width:71%; background:var(--yellow);"></div>
+          </div>
+          <span class="cat-score" style="color:var(--yellow);">71</span>
+        </div>
+        <div class="cat-row">
+          <span class="cat-name">Team Fit</span>
+          <div class="cat-bar-track">
+            <div class="cat-bar-fill" style="width:60%; background:var(--orange);"></div>
+          </div>
+          <span class="cat-score" style="color:var(--orange);">60</span>
+        </div>
+        <div class="cat-row">
+          <span class="cat-name">Ask &amp; Use of Funds</span>
+          <div class="cat-bar-track">
+            <div class="cat-bar-fill" style="width:80%; background:var(--green);"></div>
+          </div>
+          <span class="cat-score" style="color:var(--green);">80</span>
+        </div>
+      </div>
+
+      <div class="output-feedbacks">
+        <div class="feedback-item">
+          <span class="feedback-badge critical">Critical</span>
+          <span class="feedback-content">Market size is stated as "$180B global fintech market" — this is a macro stat, not your addressable segment. Investors see this and stop reading. Rebuild with SAM/SOM targeting your specific use case in your geography.</span>
+        </div>
+        <div class="feedback-item">
+          <span class="feedback-badge weak">Weak</span>
+          <span class="feedback-content">No named competitors shown. This signals inexperience. Even if you're differentiated, omitting competition implies you haven't done the research.</span>
+        </div>
+        <div class="feedback-item">
+          <span class="feedback-badge weak">Weak</span>
+          <span class="feedback-content">CTO background is one line with no technical credibility signal. Expand with prior fintech infra experience or notable past builds.</span>
+        </div>
+        <div class="feedback-item">
+          <span class="feedback-badge good">Strong</span>
+          <span class="feedback-content">Revenue model is clear and unit economics are stated. This is better than 80% of seed decks we see.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ────────────────────────────────
+     FEATURES
+──────────────────────────────── -->
+<section id="features">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">Capabilities</div>
+      <h2 class="section-headline">Built like a VC thinks.</h2>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <span class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#63d2a3" stroke-width="1.4"/><path d="M7 10l2 2 4-4" stroke="#63d2a3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <div class="feature-name">8-Criteria Evaluation</div>
+        <div class="feature-desc">Problem, market, moat, team, traction, model, ask, and narrative.</div>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <span class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L3 7v6l7 4 7-4V7L10 3Z" stroke="#63d2a3" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 3v10M3 7l7 4 7-4" stroke="#63d2a3" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </span>
+        <div class="feature-name">Stage-Aware Scoring</div>
+        <div class="feature-desc">Pre-seed, seed, and Series A rubrics are completely different. Scored appropriately.</div>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <span class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10a6 6 0 1112 0" stroke="#63d2a3" stroke-width="1.4" stroke-linecap="round"/><path d="M13 14l3-4-4-1" stroke="#63d2a3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <div class="feature-name">Re-Score Anytime</div>
+        <div class="feature-desc">Edit your deck, re-upload, watch your score move in real time.</div>
+      </div>
+      <div class="feature-card reveal reveal-delay-3">
+        <span class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 5h12v8a2 2 0 01-2 2H6a2 2 0 01-2-2V5Z" stroke="#63d2a3" stroke-width="1.4"/><path d="M8 15v2M12 15v2M6 17h8" stroke="#63d2a3" stroke-width="1.4" stroke-linecap="round"/><path d="M7 9h6M7 11.5h4" stroke="#63d2a3" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </span>
+        <div class="feature-name">Investor-Simulated Q&amp;A</div>
+        <div class="feature-desc">Ask "What will a Sequoia partner say about slide 7?" and get an answer.</div>
+      </div>
+      <div class="feature-card reveal reveal-delay-4">
+        <span class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14l4-5 3 3 3-4 4 6" stroke="#63d2a3" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="3" width="16" height="14" rx="2" stroke="#63d2a3" stroke-width="1.4"/></svg>
+        </span>
+        <div class="feature-name">Benchmark Compare</div>
+        <div class="feature-desc">See where you rank vs. funded decks in your vertical and stage.</div>
+      </div>
+      <div class="feature-card reveal reveal-delay-4">
+        <span class="feature-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="5" width="14" height="11" rx="2" stroke="#63d2a3" stroke-width="1.4"/><path d="M7 5V4a3 3 0 016 0v1" stroke="#63d2a3" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="11" r="1.5" stroke="#63d2a3" stroke-width="1.3"/></svg>
+        </span>
+        <div class="feature-name">Private by Default</div>
+        <div class="feature-desc">Your deck data is encrypted and never used to train models.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ────────────────────────────────
+     VIRAL HOOK — SCORE SHARING
+──────────────────────────────── -->
+<section id="viral">
+
+  <!-- Header stays inside normal flow -->
+  <div class="viral-header reveal">
+    <div class="section-label">Score Cards</div>
+    <h2 class="section-headline">Founders are already<br />sharing their scores.</h2>
+    <p class="section-sub">Your fundability score is a signal — to your team, your co-founder, your investors.</p>
+  </div>
+
+  <!-- Scroll track breaks out of container for full-bleed peek effect -->
+  <div class="cards-scroll-outer" id="cardsOuter">
+    <div class="cards-scroll-track" id="cardsTrack">
+
+      <div class="share-card reveal">
+        <div class="share-card-top">
+          <div class="share-founder">
+            <div class="share-avatar" style="background:linear-gradient(135deg,#1e3a2a,#0f2018);">SA</div>
+            <div>
+              <div class="share-name">Shreya A.</div>
+              <div class="share-role">Founder @ HealthStack</div>
+            </div>
+          </div>
+          <div class="share-score-badge orange">71<span>/100</span></div>
+        </div>
+        <div class="share-verdict">"Weak competitive moat — TAM credible, team strong. Market slide is killing me."</div>
+        <div class="share-tags">
+          <span class="share-tag red">Moat: 44</span>
+          <span class="share-tag green">Team: 88</span>
+          <span class="share-tag orange">Market: 61</span>
+        </div>
+      </div>
+
+      <div class="share-card reveal reveal-delay-1">
+        <div class="share-card-top">
+          <div class="share-founder">
+            <div class="share-avatar" style="background:linear-gradient(135deg,#2a1e3a,#180f28);">MK</div>
+            <div>
+              <div class="share-name">Marcus K.</div>
+              <div class="share-role">Founder @ DevFlow</div>
+            </div>
+          </div>
+          <div class="share-score-badge red">52<span>/100</span></div>
+        </div>
+        <div class="share-verdict">"Revenue model unclear, traction not shown. Rebuilt both. Now at 79."</div>
+        <div class="share-tags">
+          <span class="share-tag red">Model: 38</span>
+          <span class="share-tag red">Traction: 41</span>
+          <span class="share-tag green">Problem: 82</span>
+        </div>
+      </div>
+
+      <div class="share-card reveal reveal-delay-2">
+        <div class="share-card-top">
+          <div class="share-founder">
+            <div class="share-avatar" style="background:linear-gradient(135deg,#1e2a3a,#0f1828);">RJ</div>
+            <div>
+              <div class="share-name">Riya J.</div>
+              <div class="share-role">Founder @ LogiSense</div>
+            </div>
+          </div>
+          <div class="share-score-badge green">84<span>/100</span></div>
+        </div>
+        <div class="share-verdict">"Team slide still weak but everything else is solid. First investor meeting next week."</div>
+        <div class="share-tags">
+          <span class="share-tag green">Market: 91</span>
+          <span class="share-tag green">Model: 88</span>
+          <span class="share-tag orange">Team: 56</span>
+        </div>
+      </div>
+
+    </div><!-- /cards-scroll-track -->
+  </div><!-- /cards-scroll-outer -->
+
+  <!-- Dot indicator — mobile only, hidden on desktop via CSS -->
+  <div class="scroll-dots" id="scrollDots" aria-hidden="true">
+    <span class="dot active"></span>
+    <span class="dot"></span>
+    <span class="dot"></span>
+  </div>
+
+</section>
+
+<!-- ────────────────────────────────
+     FINAL CTA
+──────────────────────────────── -->
+<section id="final-cta">
+  <div class="container">
+    <div class="final-cta-content">
+      <div class="badge reveal" style="margin: 0 auto 16px; display: table;">
+        <span class="badge-dot"></span>
+        Waitlist open
+      </div>
+      <h2 class="final-cta-headline reveal reveal-delay-1">
+        Your deck either passes<br />
+        the VC filter <em class="gradient-text">or it doesn't.</em>
+      </h2>
+      <p class="final-cta-sub reveal reveal-delay-2">
+        Find out which side you're on — before your first meeting.
+      </p>
+      <div class="final-form reveal reveal-delay-3">
+        <input
+          type="email"
+          class="waitlist-input"
+          id="finalEmail"
+          placeholder="your@email.com"
+          autocomplete="email"
+          inputmode="email"
+        />
+        <button class="waitlist-btn" id="finalBtn" onclick="handleSignup('finalEmail','finalBtn')">
+            See My Fundability Score
+          </button>
+      </div>
+      <div class="trust-line reveal reveal-delay-4" style="justify-content:center; margin-top: 14px;">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M6 1L7.5 4.5H11L8.2 6.7L9.2 10.3L6 8.2L2.8 10.3L3.8 6.7L1 4.5H4.5L6 1Z" fill="#63d2a3" opacity="0.6"/>
+        </svg>
+        No spam. No pitch. Just early access.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-logo">Score<span>MyDeck</span></div>
+      <div class="footer-copy">© 2025 ScoreMyDeck. All rights reserved.</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ── SCROLL REVEAL ──
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      revealObserver.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12, rootMargin: '0px 0px -32px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+// ── ANIMATE SCORE RING ON VISIBLE ──
+const ringObserver = new IntersectionObserver((entries) => {
+  if (entries[0].isIntersecting) {
+    animateScore();
+    animateBars();
+    ringObserver.disconnect();
+  }
+}, { threshold: 0.3 });
+ringObserver.observe(document.getElementById('scoreMock'));
+
+function animateScore() {
+  const ring = document.getElementById('ringFill');
+  const numEl = document.getElementById('scoreNum');
+  const target = 67;
+  const circumference = 226.2;
+  const offset = circumference - (target / 100) * circumference;
+
+  let start = null;
+  const duration = 1400;
+
+  function step(ts) {
+    if (!start) start = ts;
+    const progress = Math.min((ts - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - progress, 3);
+    const current = Math.round(ease * target);
+    numEl.textContent = current;
+    const currentOffset = circumference - (ease * target / 100) * circumference;
+    ring.style.strokeDashoffset = currentOffset;
+    if (progress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function animateBars() {
+  document.querySelectorAll('.bar-fill').forEach((bar, i) => {
+    setTimeout(() => bar.classList.add('animated'), i * 120);
+  });
+}
+
+// ── SUPABASE INIT ──
+const _supabase = supabase.createClient(
+  'https://eqvlhrvfymhlbcwkittq.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdmxocnZmeW1obGJjd2tpdHRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NTA0ODAsImV4cCI6MjA4OTQyNjQ4MH0.INi3yqjiqj0Q7daNBHutwis91piictDTNgDfXmbWtmA'
+);
+
+// ── SIGNUP HANDLER ──
+async function handleSignup(emailId, btnId) {
+  const input = document.getElementById(emailId);
+  const btn = document.getElementById(btnId);
+  const email = input.value.trim().toLowerCase();
+
+  // Client-side validation
+  if (email.length > 100) return;
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    input.style.borderColor = 'rgba(240,92,92,0.5)';
+    input.style.boxShadow = '0 0 0 3px rgba(240,92,92,0.08)';
+    input.focus();
+    setTimeout(() => {
+      input.style.borderColor = '';
+      input.style.boxShadow = '';
+    }, 1200);
+    return;
+  }
+
+  // Loading state
+  const originalText = btn.textContent;
+  btn.textContent = 'Submitting…';
+  btn.disabled = true;
+  input.disabled = true;
+
+  // Remove any existing status message for this form
+  const existingMsg = document.getElementById(emailId + '_msg');
+  if (existingMsg) existingMsg.remove();
+
+  try {
+    const { error } = await _supabase
+      .from('waitlist')
+      .insert([{ email }]);
+
+    if (!error) {
+      // ── SUCCESS ──
+      btn.textContent = '✓ You\'re In';
+      btn.classList.add('success');
+      showStatusMessage(input, 'success', "You're on the list. We'll reach out before launch.");
+      if (window.va) { window.va('track', 'signup'); }
+      showToast();
+      stickyDismissed = true;
+      document.getElementById('stickyCta').classList.remove('visible');
+    } else if (error.code === '23505') {
+      // ── DUPLICATE EMAIL ──
+      btn.textContent = originalText;
+      btn.disabled = false;
+      input.disabled = false;
+      input.style.borderColor = 'rgba(240,200,74,0.5)';
+      input.style.boxShadow = '0 0 0 3px rgba(240,200,74,0.07)';
+      showStatusMessage(input, 'duplicate', 'That email is already on the waitlist.');
+      setTimeout(() => {
+        input.style.borderColor = '';
+        input.style.boxShadow = '';
+      }, 2000);
+    } else {
+      throw error;
+    }
+  } catch (err) {
+    // ── ERROR ──
+    btn.textContent = originalText;
+    btn.disabled = false;
+    input.disabled = false;
+    input.style.borderColor = 'rgba(240,92,92,0.5)';
+    input.style.boxShadow = '0 0 0 3px rgba(240,92,92,0.08)';
+    showStatusMessage(input, 'error', 'Something went wrong. Try again in a moment.');
+    setTimeout(() => {
+      input.style.borderColor = '';
+      input.style.boxShadow = '';
+    }, 2000);
+    console.error('Supabase error:', err);
+  }
+}
+
+function showStatusMessage(inputEl, type, text) {
+  const colors = {
+    success:   '#63d2a3',
+    duplicate: '#f0c84a',
+    error:     '#f05c5c',
+  };
+  const msg = document.createElement('div');
+  msg.id = inputEl.id + '_msg';
+  msg.style.cssText = `
+    font-size: 12px;
+    color: ${colors[type]};
+    margin-top: 6px;
+    padding-left: 2px;
+    line-height: 1.45;
+    animation: fadeInMsg 0.25s ease;
+  `;
+  msg.textContent = text;
+
+  // Insert after the form row (parent of the input)
+  const formRow = inputEl.closest('.waitlist-form');
+  if (formRow && formRow.parentNode) {
+    const existing = document.getElementById(inputEl.id + '_msg');
+    if (existing) existing.remove();
+    formRow.parentNode.insertBefore(msg, formRow.nextSibling);
+  }
+}
+
+function showToast() {
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+// ── STICKY CTA ──
+let stickyDismissed = false;
+let heroVisible = true;
+
+const heroSection = document.getElementById('hero');
+const heroObserver = new IntersectionObserver((entries) => {
+  heroVisible = entries[0].isIntersecting;
+  updateSticky();
+}, { threshold: 0.1 });
+heroObserver.observe(heroSection);
+
+function updateSticky() {
+  const sticky = document.getElementById('stickyCta');
+  if (!stickyDismissed && !heroVisible) {
+    sticky.classList.add('visible');
+  } else {
+    sticky.classList.remove('visible');
+  }
+}
+
+function dismissSticky() {
+  stickyDismissed = true;
+  document.getElementById('stickyCta').classList.remove('visible');
+}
+
+function scrollToHero() {
+  document.getElementById('heroEmail').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => document.getElementById('heroEmail').focus(), 600);
+  dismissSticky();
+}
+
+// ── HERO EMAIL ENTER KEY ──
+document.getElementById('heroEmail').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleSignup('heroEmail', 'heroBtn');
+});
+document.getElementById('finalEmail').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleSignup('finalEmail', 'finalBtn');
+});
+
+// ── INITIAL REVEAL TRIGGER (above fold) ──
+setTimeout(() => {
+  document.querySelectorAll('.reveal').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight) {
+      el.classList.add('visible');
+    }
+  });
+}, 100);
+
+// ── SCORE CARDS SCROLL BEHAVIOUR ──
+(function () {
+  const track  = document.getElementById('cardsTrack');
+  const outer  = document.getElementById('cardsOuter');
+  const dots   = document.querySelectorAll('#scrollDots .dot');
+  const cards  = track ? track.querySelectorAll('.share-card') : [];
+
+  if (!track || !cards.length) return;
+
+  let rafId = null;
+
+  function onScroll () {
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      updateState();
+    });
+  }
+
+  function updateState () {
+    const trackW     = track.scrollWidth;
+    const visibleW   = track.clientWidth;
+    const scrollLeft = track.scrollLeft;
+    const maxScroll  = trackW - visibleW;
+
+    // Fade overlay — hide when at/near end
+    if (outer) {
+      outer.classList.toggle('at-end', scrollLeft >= maxScroll - 8);
+    }
+
+    // Active card — whichever card's left edge is closest to scrollLeft
+    let activeIndex = 0;
+    let minDist = Infinity;
+    cards.forEach((card, i) => {
+      const dist = Math.abs(card.offsetLeft - scrollLeft - parseInt(getComputedStyle(track).paddingLeft));
+      if (dist < minDist) { minDist = dist; activeIndex = i; }
+    });
+
+    cards.forEach((card, i) => card.classList.toggle('is-active', i === activeIndex));
+
+    // Dots
+    dots.forEach((dot, i) => dot.classList.toggle('active', i === activeIndex));
+  }
+
+  track.addEventListener('scroll', onScroll, { passive: true });
+
+  // Init state on load
+  setTimeout(updateState, 80);
+})();
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>
